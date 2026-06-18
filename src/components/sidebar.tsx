@@ -40,7 +40,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({
-  messages,
+  // messages, not needed here, but kept for future use if needed
   isCollapsed,
   isMobile,
   chatId,
@@ -50,14 +50,13 @@ export function Sidebar({
   const [localChats, setLocalChats] = useState<
     { chatId: string; messages: Message[] }[]
   >([]);
-  const localChatss = useLocalStorageData("chat_", []);
-  const [selectedChatId, setSselectedChatId] = useState<string | null>(null);
+  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
     if (chatId) {
-      setSselectedChatId(chatId);
+      setSelectedChatId(chatId);
     }
 
     setLocalChats(getLocalstorageChats());
@@ -68,42 +67,55 @@ export function Sidebar({
     return () => {
       window.removeEventListener("storage", handleStorageChange);
     };
-  }, []);
+  }, [chatId]); // Added chatId dependency to update highlights on route change
 
   const getLocalstorageChats = (): {
     chatId: string;
     messages: Message[];
   }[] => {
-    const chats = Object.keys(localStorage).filter((key) =>
-      key.startsWith("chat_")
+    if (typeof window === "undefined") return [];
+
+    // ✅ FIX 1: Filter out known non-chat settings keys instead of filtering for "chat_"
+    const chatKeys = Object.keys(localStorage).filter(
+      (key) => key !== "selectedModel" && key !== "ollama_user"
     );
 
-    if (chats.length === 0) {
+    if (chatKeys.length === 0) {
       setIsLoading(false);
+      return [];
     }
 
-    // Map through the chats and return an object with chatId and messages
-    const chatObjects = chats.map((chat) => {
-      const item = localStorage.getItem(chat);
-      return item
-        ? { chatId: chat, messages: JSON.parse(item) }
-        : { chatId: "", messages: [] };
+    const chatObjects = chatKeys.map((key) => {
+      const item = localStorage.getItem(key);
+      try {
+        return item
+          ? { chatId: key, messages: JSON.parse(item) }
+          : { chatId: key, messages: [] };
+      } catch (e) {
+        return { chatId: key, messages: [] };
+      }
     });
 
-    // Sort chats by the createdAt date of the first message of each chat
+    // Sort chats safely by checking if messages and dates exist
     chatObjects.sort((a, b) => {
-      const aDate = new Date(a.messages[0].createdAt);
-      const bDate = new Date(b.messages[0].createdAt);
-      return bDate.getTime() - aDate.getTime();
+      const aTime = a.messages?.[0]?.createdAt ? new Date(a.messages[0].createdAt).getTime() : 0;
+      const bTime = b.messages?.[0]?.createdAt ? new Date(b.messages[0].createdAt).getTime() : 0;
+      return bTime - aTime;
     });
 
     setIsLoading(false);
     return chatObjects;
   };
 
-  const handleDeleteChat = (chatId: string) => {
-    localStorage.removeItem(chatId);
+  const handleDeleteChat = (targetId: string) => {
+    localStorage.removeItem(targetId);
     setLocalChats(getLocalstorageChats());
+
+    // If we deleted the active chat, redirect back to root landing view
+    if (targetId === selectedChatId) {
+      setMessages([]);
+      router.push("/");
+    }
   };
 
   return (
@@ -111,11 +123,10 @@ export function Sidebar({
       data-collapsed={isCollapsed}
       className="relative justify-between group lg:bg-accent/20 lg:dark:bg-card/35 flex flex-col h-full gap-4 p-2 data-[collapsed=true]:p-2 "
     >
-      <div className=" flex flex-col justify-between p-2 max-h-fit overflow-y-auto">
+      <div className="flex flex-col justify-between p-2 max-h-fit overflow-y-auto">
         <Button
           onClick={() => {
             router.push("/");
-            // Clear messages
             setMessages([]);
             if (closeSidebar) {
               closeSidebar();
@@ -142,25 +153,25 @@ export function Sidebar({
         <div className="flex flex-col pt-10 gap-2">
           <p className="pl-4 text-xs text-muted-foreground">Your chats</p>
           {localChats.length > 0 && (
-            <div>
-              {localChats.map(({ chatId, messages }, index) => (
+            <div className="flex flex-col gap-1">
+              {localChats.map(({ chatId: id, messages: chatMsgs }, index) => (
                 <Link
                   key={index}
-                  href={`/${chatId.substr(5)}`}
+                  href={`/${id}`} // ✅ FIX 2: Using raw ID directly, no .substr(5)
                   className={cn(
                     {
                       [buttonVariants({ variant: "secondaryLink" })]:
-                        chatId.substring(5) === selectedChatId,
+                        id === selectedChatId, // ✅ FIX 3: Clean comparison without substring offsets
                       [buttonVariants({ variant: "ghost" })]:
-                        chatId.substring(5) !== selectedChatId,
+                        id !== selectedChatId,
                     },
-                    "flex justify-between w-full h-14 text-base font-normal items-center "
+                    "flex justify-between w-full h-14 text-base font-normal items-center px-4"
                   )}
                 >
-                  <div className="flex gap-3 items-center truncate">
-                    <div className="flex flex-col">
-                      <span className="text-xs font-normal ">
-                        {messages.length > 0 ? messages[0].content : ""}
+                  <div className="flex gap-3 items-center truncate max-w-[75%]">
+                    <div className="flex flex-col truncate">
+                      <span className="text-xs font-normal truncate">
+                        {chatMsgs.length > 0 ? chatMsgs[0].content : "Empty Chat"}
                       </span>
                     </div>
                   </div>
@@ -168,13 +179,13 @@ export function Sidebar({
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"
-                        className="flex justify-end items-center"
-                        onClick={(e) => e.stopPropagation()}
+                        className="h-8 w-8 p-0 flex justify-end items-center"
+                        onClick={(e) => e.preventDefault()} // Stops Link navigation on open
                       >
                         <MoreHorizontal size={15} className="shrink-0" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent className=" ">
+                    <DropdownMenuContent align="end">
                       <Dialog>
                         <DialogTrigger asChild>
                           <Button
@@ -186,7 +197,7 @@ export function Sidebar({
                             Delete chat
                           </Button>
                         </DialogTrigger>
-                        <DialogContent>
+                        <DialogContent onClick={(e) => e.stopPropagation()}>
                           <DialogHeader className="space-y-4">
                             <DialogTitle>Delete chat?</DialogTitle>
                             <DialogDescription>
@@ -197,7 +208,7 @@ export function Sidebar({
                               <Button variant="outline">Cancel</Button>
                               <Button
                                 variant="destructive"
-                                onClick={() => handleDeleteChat(chatId)}
+                                onClick={() => handleDeleteChat(id)}
                               >
                                 Delete
                               </Button>

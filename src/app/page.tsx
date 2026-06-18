@@ -20,9 +20,16 @@ import { Message, useChat } from "ai/react";
 import React, { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
-import useChatStore from "./hooks/useChatStore";
+import useChatStore from "@/app/hooks/useChatStore";
 
-export default function Home() {
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
+
+export default function Page({ params }: PageProps) {
+  const unpackedParams = React.use(params);
+  const activeId = unpackedParams.id;
+
   const {
     messages,
     input,
@@ -30,11 +37,12 @@ export default function Home() {
     handleSubmit,
     isLoading,
     error,
-    data,
     stop,
     setMessages,
     setInput,
   } = useChat({
+    id: activeId,
+    initialMessages: [],
     onResponse: (response) => {
       if (response) {
         setLoadingSubmit(false);
@@ -45,101 +53,111 @@ export default function Home() {
       toast.error("An error occurred. Please try again.");
     },
   });
-  const [chatId, setChatId] = React.useState<string>("");
-  const [selectedModel, setSelectedModel] = React.useState<string>(
-    getSelectedModel()
-  );
-  const [open, setOpen] = React.useState(false);
-  const [ollama, setOllama] = useState<ChatOllama>();
-  const env = process.env.NODE_ENV;
-  const [loadingSubmit, setLoadingSubmit] = React.useState(false);
+
+  const [selectedModel, setSelectedModel] = useState<string>("REST API");
+  const [open, setOpen] = useState(false); // ✅ Restored initialization open state flag
+  const [ollama, setOllama] = useState<ChatOllama | undefined>(undefined);
+  const [loadingSubmit, setLoadingSubmit] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
+
   const base64Images = useChatStore((state) => state.base64Images);
   const setBase64Images = useChatStore((state) => state.setBase64Images);
+  const env = process.env.NODE_ENV;
 
+  // Safe Client hydration for history log entries & settings
   useEffect(() => {
-    if (messages.length < 1) {
-      // Generate a random id for the chat
-      console.log("Generating chat id");
-      const id = uuidv4();
-      setChatId(id);
-    }
-  }, [messages]);
+    if (typeof window !== "undefined") {
+      setSelectedModel(getSelectedModel());
 
-  React.useEffect(() => {
-    if (!isLoading && !error && chatId && messages.length > 0) {
-      // Save messages to local storage
-      localStorage.setItem(`chat_${chatId}`, JSON.stringify(messages));
-      // Trigger the storage event to update the sidebar component
-      window.dispatchEvent(new Event("storage"));
-    }
-  }, [chatId, isLoading, error]);
+      //Get localStorage item for active chat session and parse it safely
+      const item = localStorage.getItem(activeId);
+      if (item) {
+        try {
+          setMessages(JSON.parse(item));
+        } catch (e) {
+          console.error("Failed to parse history logs:", e);
+        }
+      }
 
+      // ✅ Restored: Verify profile parameters on deep-linked page initialization
+      if (!localStorage.getItem("ollama_user")) {
+        setOpen(true);
+      }
+    }
+  }, [activeId, setMessages]);
+
+  // Setup Ollama pipeline engine configuration
   useEffect(() => {
-    if (env === "production") {
+    if (env === "production" && selectedModel !== "REST API") {
       const newOllama = new ChatOllama({
         baseUrl: process.env.NEXT_PUBLIC_OLLAMA_URL || "http://localhost:11434",
         model: selectedModel,
       });
       setOllama(newOllama);
     }
+  }, [selectedModel, env]);
 
-    if (!localStorage.getItem("ollama_user")) {
-      setOpen(true);
-    }
-  }, [selectedModel]);
+  // Sync updates back to disk for non-production frameworks
+  useEffect(() => {
+    if (!activeId || isLoading || error || messages.length === 0) return;
+    if (env === "production" && selectedModel !== "REST API" && loadingSubmit) return;
 
-  const addMessage = (Message: Message) => {
-    messages.push(Message);
+    localStorage.setItem(activeId, JSON.stringify(messages));
     window.dispatchEvent(new Event("storage"));
-    setMessages([...messages]);
-  };
+  }, [messages, isLoading, error, activeId, env, selectedModel, loadingSubmit]);
 
-  // Function to handle chatting with Ollama in production (client side)
-  const handleSubmitProduction = async (
-    e: React.FormEvent<HTMLFormElement>
-  ) => {
+  const handleSubmitProduction = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!input.trim() || !ollama) return;
 
-    addMessage({ role: "user", content: input, id: chatId });
+    const userMsg: Message = { role: "user", content: input, id: uuidv4() };
     setInput("");
 
-    if (ollama) {
-      try {
-        const parser = new BytesOutputParser();
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
 
-        const stream = await ollama
-          .pipe(parser)
-          .stream(
-            (messages as Message[]).map((m) =>
-              m.role == "user"
-                ? new HumanMessage(m.content)
-                : new AIMessage(m.content)
-            )
-          );
+    try {
+      const parser = new BytesOutputParser();
+      const stream = await ollama.pipe(parser).stream(
+        updatedMessages.map((m) =>
+          m.role === "user" ? new HumanMessage(m.content) : new AIMessage(m.content)
+        )
+      );
 
-        const decoder = new TextDecoder();
+      const decoder = new TextDecoder();
+      let responseMessage = "";
+      const assistantMessageId = uuidv4();
 
-        let responseMessage = "";
-        for await (const chunk of stream) {
-          const decodedChunk = decoder.decode(chunk);
-          responseMessage += decodedChunk;
-          setLoadingSubmit(false);
-          setMessages([
-            ...messages,
-            { role: "assistant", content: responseMessage, id: chatId },
-          ]);
-        }
-        addMessage({ role: "assistant", content: responseMessage, id: chatId });
-        setMessages([...messages]);
+      setLoadingSubmit(false);
 
-        localStorage.setItem(`chat_${chatId}`, JSON.stringify(messages));
-        // Trigger the storage event to update the sidebar component
-        window.dispatchEvent(new Event("storage"));
-      } catch (error) {
-        toast.error("An error occurred. Please try again.");
-        setLoadingSubmit(false);
+      for await (const chunk of stream) {
+        const decodedChunk = decoder.decode(chunk, { stream: true });
+        responseMessage += decodedChunk;
+
+        setMessages((prevMessages) => {
+          const filtered = prevMessages.filter((m) => m.id !== assistantMessageId);
+          const nextHistory = [
+            ...filtered,
+            { role: "assistant" as const, content: responseMessage, id: assistantMessageId },
+          ];
+
+          localStorage.setItem(activeId, JSON.stringify(nextHistory));
+          return nextHistory;
+        });
       }
+
+      window.dispatchEvent(new Event("storage"));
+
+    } catch (err) {
+      console.error(err);
+      // 1. Convert the unknown error safely
+      const standardError = err instanceof Error ? err : new Error("Ollama connection failed");
+
+      // 2. Explicitly call your unified error configuration block manually
+      // This allows you to maintain single-point error monitoring:
+      setLoadingSubmit(false);
+      toast.error("An error occurred. Please try again.");
+      setLoadingSubmit(false);
     }
   };
 
@@ -147,57 +165,41 @@ export default function Home() {
     e.preventDefault();
     setLoadingSubmit(true);
 
-    setMessages([...messages]);
-
     const attachments: Attachment[] = base64Images
-    ? base64Images.map((image) => ({
-        contentType: 'image/base64', // Content type for base64 images
-        url: image, // The base64 image data
-      }))
-    : [];
+      ? base64Images.map((image) => ({ contentType: "image/base64", url: image }))
+      : [];
 
-    // Prepare the options object with additional body data, to pass the model.
     const requestOptions: ChatRequestOptions = {
-      options: {
-        body: {
-          selectedModel: selectedModel,
-        },
-      },
+      options: { body: { selectedModel } },
       ...(base64Images && {
-        data: {
-          images: base64Images,
-        },
-        experimental_attachments: attachments
+        data: { images: base64Images },
+        experimental_attachments: attachments,
       }),
     };
 
-    messages.slice(0, -1)
-    
-
-    if (env === "production") {
+    if (env === "production" && selectedModel !== "REST API") {
       handleSubmitProduction(e);
-      setBase64Images(null)
+      setBase64Images(null);
     } else {
-      // Call the handleSubmit function with the options
       handleSubmit(e, requestOptions);
-      setBase64Images(null)
+      setBase64Images(null);
     }
   };
 
-  const onOpenChange = (isOpen: boolean) => { 
+  const onOpenChange = (isOpen: boolean) => {
     const username = localStorage.getItem("ollama_user")
     if (username) return setOpen(isOpen)
 
-    localStorage.setItem("ollama_user", "Anonymous")
-    window.dispatchEvent(new Event("storage"))
-    setOpen(isOpen)
-  }
-  
+    localStorage.setItem("ollama_user", "Anonymous");
+    window.dispatchEvent(new Event("storage"));
+    setOpen(isOpen);
+  };
+
   return (
     <main className="flex h-[calc(100dvh)] flex-col items-center ">
       <Dialog open={open} onOpenChange={onOpenChange}>
         <ChatLayout
-          chatId=""
+          chatId={activeId}
           setSelectedModel={setSelectedModel}
           messages={messages}
           input={input}
@@ -209,7 +211,7 @@ export default function Home() {
           stop={stop}
           navCollapsedSize={10}
           defaultLayout={[30, 160]}
-          formRef={formRef}
+          formRef={formRef as React.RefObject<HTMLFormElement>}
           setMessages={setMessages}
           setInput={setInput}
         />
@@ -217,8 +219,7 @@ export default function Home() {
           <DialogHeader className="space-y-2">
             <DialogTitle>Welcome to Ollama!</DialogTitle>
             <DialogDescription>
-              Enter your name to get started. This is just to personalize your
-              experience.
+              Enter your name to get started. This is just to personalize your experience.
             </DialogDescription>
             <UsernameForm setOpen={setOpen} />
           </DialogHeader>
