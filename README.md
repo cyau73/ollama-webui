@@ -1,10 +1,10 @@
-<div align="center">
-  <img src="ollama-nextjs-ui.gif">
-</div>
-
 <h1 align="center">
   Fully-featured & beautiful web interface for Ollama LLMs
 </h1>
+
+<div align="center">
+  <img src="ollama-nextjs-ui.gif">
+</div>
 
 <div align="center">
   
