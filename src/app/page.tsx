@@ -1,3 +1,4 @@
+//app/page.tsx
 "use client";
 
 import { ChatLayout } from "@/components/chat/chat-layout";
@@ -28,7 +29,8 @@ interface PageProps {
 
 export default function Page({ params }: PageProps) {
   const unpackedParams = React.use(params);
-  const activeId = unpackedParams.id;
+  const activeId = React.useMemo(() => unpackedParams.id || uuidv4(), [unpackedParams.id]);
+  const isHydrated = useRef(false); // Add this at the top of your component
 
   const {
     messages,
@@ -48,6 +50,13 @@ export default function Page({ params }: PageProps) {
         setLoadingSubmit(false);
       }
     },
+    // Add the onFinish callback to save after every successful stream
+    onFinish: (message) => {
+      if (!activeId) return;
+      const updatedHistory = [...messages, message];
+      saveToLocalStorage(activeId, updatedHistory);
+      window.dispatchEvent(new Event("storage"));
+    },
     onError: (error) => {
       setLoadingSubmit(false);
       toast.error("An error occurred. Please try again.");
@@ -66,14 +75,22 @@ export default function Page({ params }: PageProps) {
 
   // Safe Client hydration for history log entries & settings
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    console.log("Component Rendered. Messages length:", messages.length);
+    console.log("Current activeId:", activeId);
+
+    if (isHydrated.current || !activeId) return;
+
+    if (typeof window !== "undefined" && activeId) {
       setSelectedModel(getSelectedModel());
 
       //Get localStorage item for active chat session and parse it safely
       const item = localStorage.getItem(activeId);
       if (item) {
         try {
-          setMessages(JSON.parse(item));
+          const parsed = JSON.parse(item);
+          if (JSON.stringify(parsed) !== JSON.stringify(messages)) {
+            setMessages(parsed);
+          }
         } catch (e) {
           console.error("Failed to parse history logs:", e);
         }
@@ -83,6 +100,8 @@ export default function Page({ params }: PageProps) {
       if (!localStorage.getItem("ollama_user")) {
         setOpen(true);
       }
+
+      isHydrated.current = true; // Mark as hydrated after successfully loading messages
     }
   }, [activeId, setMessages]);
 
@@ -97,18 +116,26 @@ export default function Page({ params }: PageProps) {
     }
   }, [selectedModel, env]);
 
-  // Sync updates back to disk for non-production frameworks
-  useEffect(() => {
-    if (!activeId || isLoading || error || messages.length === 0) return;
-    if (env === "production" && selectedModel !== "REST API" && loadingSubmit) return;
-
-    localStorage.setItem(activeId, JSON.stringify(messages));
-    window.dispatchEvent(new Event("storage"));
-  }, [messages, isLoading, error, activeId, env, selectedModel, loadingSubmit]);
+  const saveToLocalStorage = (id: string, data: any) => {
+    if (!id || id === 'undefined') {
+      console.warn("Attempted to save with an invalid ID, skipping storage.");
+      return;
+    }
+    try {
+      localStorage.setItem(id, JSON.stringify(data));
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "QuotaExceededError") {
+        console.error("Storage limit reached! You need to clear old chats.");
+        toast.error("Storage full: Cannot save new messages.");
+      } else {
+        console.error("Failed to save to localStorage:", e);
+      }
+    }
+  };
 
   const handleSubmitProduction = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!input.trim() || !ollama) return;
+    if (!input.trim() || !ollama || !activeId) return;
 
     const userMsg: Message = { role: "user", content: input, id: uuidv4() };
     setInput("");
@@ -124,16 +151,16 @@ export default function Page({ params }: PageProps) {
         )
       );
 
-      const decoder = new TextDecoder();
       let responseMessage = "";
       const assistantMessageId = uuidv4();
 
-      setLoadingSubmit(false);
+      const decoder = new TextDecoder();
 
       for await (const chunk of stream) {
         const decodedChunk = decoder.decode(chunk, { stream: true });
         responseMessage += decodedChunk;
 
+        //Update UI State only
         setMessages((prevMessages) => {
           const filtered = prevMessages.filter((m) => m.id !== assistantMessageId);
           const nextHistory = [
@@ -141,22 +168,26 @@ export default function Page({ params }: PageProps) {
             { role: "assistant" as const, content: responseMessage, id: assistantMessageId },
           ];
 
-          localStorage.setItem(activeId, JSON.stringify(nextHistory));
           return nextHistory;
         });
       }
+      // Storage after the loop to ensure the final message is saved
+      const finalHistory = [...updatedMessages, { role: "assistant", content: responseMessage, id: assistantMessageId }];
+      saveToLocalStorage(activeId, finalHistory);
 
+      // Notify app that storage is completed
       window.dispatchEvent(new Event("storage"));
 
     } catch (err) {
       console.error(err);
       // 1. Convert the unknown error safely
       const standardError = err instanceof Error ? err : new Error("Ollama connection failed");
-
+      console.error(err);
       // 2. Explicitly call your unified error configuration block manually
       // This allows you to maintain single-point error monitoring:
-      setLoadingSubmit(false);
       toast.error("An error occurred. Please try again.");
+      setLoadingSubmit(false);
+    } finally {
       setLoadingSubmit(false);
     }
   };
