@@ -44,26 +44,28 @@ export default function ChatTopbar({
   useEffect(() => {
     setCurrentModel(getSelectedModel());
 
-    const env = process.env.NODE_ENV;
-    console.log("NODE_ENV", env);
-
     const fetchModels = async () => {
+      try {
+        const res = await fetch("/api/tags");
 
-      if (env === "production") {
-        console.log("URL", process.env.NEXT_PUBLIC_OLLAMA_URL);
+        // Check if the response is actually OK before parsing
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error("Server returned an error:", res.status, errorText);
+          return;
+        }
 
-        const fetchedModels = await fetch(process.env.NEXT_PUBLIC_OLLAMA_URL + "/api/tags");
-        const json = await fetchedModels.json();
-        const apiModels = json.models.map((model: any) => model.name);
-        setModels([...apiModels]);
+        const json = await res.json();
+
+        // Safety check: ensure json.models exists
+        if (json && json.models) {
+          const apiModels = json.models.map((model: any) => model.name);
+          setModels([...apiModels]);
+        }
+      } catch (err) {
+        console.error("Network or Parsing error:", err);
       }
-      else {
-        const fetchedModels = await fetch("/api/tags")
-        const json = await fetchedModels.json();
-        const apiModels = json.models.map((model: any) => model.name);
-        setModels([...apiModels]);
-      }
-    }
+    };
     fetchModels();
   }, []);
 

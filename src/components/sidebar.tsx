@@ -108,10 +108,12 @@ export function Sidebar({
     return chatObjects;
   };
 
+  const [deletingChatId, setDeletingChatId] = useState<string | null>(null);
+
   const handleDeleteChat = (targetId: string) => {
     localStorage.removeItem(targetId);
     setLocalChats(getLocalstorageChats());
-
+    setDeletingChatId(null);
     // If we deleted the active chat, redirect back to root landing view
     if (targetId === selectedChatId) {
       setMessages([]);
@@ -157,7 +159,7 @@ export function Sidebar({
             <div className="flex flex-col gap-1">
               {localChats.map(({ chatId: id, messages: chatMsgs }, index) => (
                 <Link
-                  key={index}
+                  key={id}
                   href={`/${id}`} // ✅ FIX 2: Using raw ID directly, no .substr(5)
                   className={cn(
                     {
@@ -187,12 +189,15 @@ export function Sidebar({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <Dialog>
+                      <Dialog
+                        open={deletingChatId === id}
+                        onOpenChange={(isOpen) => setDeletingChatId(isOpen ? id : null)}
+                      >
                         <DialogTrigger asChild>
                           <Button
                             variant="ghost"
                             className="w-full flex gap-2 hover:text-red-500 text-red-500 justify-start items-center"
-                            onClick={(e) => e.stopPropagation()}
+                            onClick={(e) => { e.stopPropagation(); setDeletingChatId(id); }}
                           >
                             <Trash2 className="shrink-0 w-4 h-4" />
                             Delete chat
@@ -206,7 +211,7 @@ export function Sidebar({
                               action cannot be undone.
                             </DialogDescription>
                             <div className="flex justify-end gap-2">
-                              <Button variant="outline">Cancel</Button>
+                              <Button variant="outline" onClick={() => setDeletingChatId(null)}>Cancel</Button>
                               <Button
                                 variant="destructive"
                                 onClick={() => handleDeleteChat(id)}

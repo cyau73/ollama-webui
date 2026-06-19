@@ -1,3 +1,4 @@
+//app/api/chat/route.ts
 import { createOllama } from 'ollama-ai-provider';
 import { streamText, convertToCoreMessages, CoreMessage, UserContent } from 'ai';
 
@@ -8,8 +9,8 @@ export async function POST(req: Request) {
   // Destructure request data
   const { messages, selectedModel, data } = await req.json();
 
-  const initialMessages = messages.slice(0, -1); 
-  const currentMessage = messages[messages.length - 1]; 
+  const initialMessages = messages.slice(0, -1);
+  const currentMessage = messages[messages.length - 1];
 
   const ollama = createOllama({});
 

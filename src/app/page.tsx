@@ -13,9 +13,9 @@ import {
 import { Input } from "@/components/ui/input";
 import UsernameForm from "@/components/username-form";
 import { getSelectedModel } from "@/lib/model-helper";
-import { ChatOllama } from "@langchain/community/chat_models/ollama";
-import { AIMessage, HumanMessage } from "@langchain/core/messages";
-import { BytesOutputParser } from "@langchain/core/output_parsers";
+// import { ChatOllama } from "@langchain/community/chat_models/ollama";
+// import { AIMessage, HumanMessage } from "@langchain/core/messages";
+// import { BytesOutputParser } from "@langchain/core/output_parsers";
 import { Attachment, ChatRequestOptions } from "ai";
 import { Message, useChat } from "ai/react";
 import React, { useEffect, useRef, useState } from "react";
@@ -75,7 +75,7 @@ export default function Page({ params }: PageProps) {
 
   const [selectedModel, setSelectedModel] = useState<string>("REST API");
   const [open, setOpen] = useState(false); // ✅ Restored initialization open state flag
-  const [ollama, setOllama] = useState<ChatOllama | undefined>(undefined);
+  // const [ollama, setOllama] = useState<ChatOllama | undefined>(undefined);
   const [loadingSubmit, setLoadingSubmit] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -118,15 +118,15 @@ export default function Page({ params }: PageProps) {
   }, [activeId, setMessages]);
 
   // Setup Ollama pipeline engine configuration
-  useEffect(() => {
-    if (env === "production" && selectedModel !== "REST API") {
-      const newOllama = new ChatOllama({
-        baseUrl: process.env.NEXT_PUBLIC_OLLAMA_URL || "http://localhost:11434",
-        model: selectedModel,
-      });
-      setOllama(newOllama);
-    }
-  }, [selectedModel, env]);
+  // useEffect(() => {
+  //   if (env === "production" && selectedModel !== "REST API") {
+  //     const newOllama = new ChatOllama({
+  //       baseUrl: process.env.NEXT_PUBLIC_OLLAMA_URL || "http://localhost:11434",
+  //       model: selectedModel,
+  //     });
+  //     setOllama(newOllama);
+  //   }
+  // }, [selectedModel, env]);
 
   // Add this helper to your page.tsx or a utility file
   const initializeChat = (id: string) => {
@@ -152,69 +152,69 @@ export default function Page({ params }: PageProps) {
     }
   };
 
-  const handleSubmitProduction = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!input.trim() || !ollama || !activeId) return;
+  // const handleSubmitProduction = async (e: React.FormEvent<HTMLFormElement>) => {
+  //   e.preventDefault();
+  //   if (!input.trim() || !ollama || !activeId) return;
 
-    const userMsg: Message = { role: "user", content: input, id: uuidv4() };
-    setInput("");
+  //   const userMsg: Message = { role: "user", content: input, id: uuidv4() };
+  //   setInput("");
 
-    const updatedMessages = [...messages, userMsg];
-    setMessages(updatedMessages);
+  //   const updatedMessages = [...messages, userMsg];
+  //   setMessages(updatedMessages);
 
-    try {
-      const parser = new BytesOutputParser();
-      const stream = await ollama.pipe(parser).stream(
-        updatedMessages.map((m) =>
-          m.role === "user" ? new HumanMessage(m.content) : new AIMessage(m.content)
-        )
-      );
+  //   try {
+  //     const parser = new BytesOutputParser();
+  //     const stream = await ollama.pipe(parser).stream(
+  //       updatedMessages.map((m) =>
+  //         m.role === "user" ? new HumanMessage(m.content) : new AIMessage(m.content)
+  //       )
+  //     );
 
-      let responseMessage = "";
-      const assistantMessageId = uuidv4();
+  //     let responseMessage = "";
+  //     const assistantMessageId = uuidv4();
 
-      const decoder = new TextDecoder();
+  //     const decoder = new TextDecoder();
 
-      for await (const chunk of stream) {
-        const decodedChunk = decoder.decode(chunk, { stream: true });
-        responseMessage += decodedChunk;
+  //     for await (const chunk of stream) {
+  //       const decodedChunk = decoder.decode(chunk, { stream: true });
+  //       responseMessage += decodedChunk;
 
-        //Update UI State only
-        setMessages((prevMessages) => {
-          const filtered = prevMessages.filter((m) => m.id !== assistantMessageId);
-          const nextHistory = [
-            ...filtered,
-            { role: "assistant" as const, content: responseMessage, id: assistantMessageId },
-          ];
+  //       //Update UI State only
+  //       setMessages((prevMessages) => {
+  //         const filtered = prevMessages.filter((m) => m.id !== assistantMessageId);
+  //         const nextHistory = [
+  //           ...filtered,
+  //           { role: "assistant" as const, content: responseMessage, id: assistantMessageId },
+  //         ];
 
-          return nextHistory;
-        });
-      }
-      // Storage after the loop to ensure the final message is saved
-      const finalHistory = [...updatedMessages, { role: "assistant", content: responseMessage, id: assistantMessageId }];
-      saveToLocalStorage(activeId, finalHistory);
+  //         return nextHistory;
+  //       });
+  //     }
+  //     // Storage after the loop to ensure the final message is saved
+  //     const finalHistory = [...updatedMessages, { role: "assistant", content: responseMessage, id: assistantMessageId }];
+  //     saveToLocalStorage(activeId, finalHistory);
 
-      // Notify app that storage is completed
-      window.dispatchEvent(new Event("storage"));
+  //     // Notify app that storage is completed
+  //     window.dispatchEvent(new Event("storage"));
 
-      if (isPendingNavigation) {
-        isPendingNavigation.current = false;
-        router.push(`/${activeId}`); // Navigate here after successful storage
-      }
+  //     if (isPendingNavigation) {
+  //       isPendingNavigation.current = false;
+  //       router.push(`/${activeId}`); // Navigate here after successful storage
+  //     }
 
-    } catch (err) {
-      console.error(err);
-      // 1. Convert the unknown error safely
-      const standardError = err instanceof Error ? err : new Error("Ollama connection failed");
-      console.error(err);
-      // 2. Explicitly call your unified error configuration block manually
-      // This allows you to maintain single-point error monitoring:
-      toast.error("An error occurred. Please try again.");
-      setLoadingSubmit(false);
-    } finally {
-      setLoadingSubmit(false);
-    }
-  };
+  //   } catch (err) {
+  //     console.error(err);
+  //     // 1. Convert the unknown error safely
+  //     const standardError = err instanceof Error ? err : new Error("Ollama connection failed");
+  //     console.error(err);
+  //     // 2. Explicitly call your unified error configuration block manually
+  //     // This allows you to maintain single-point error monitoring:
+  //     toast.error("An error occurred. Please try again.");
+  //     setLoadingSubmit(false);
+  //   } finally {
+  //     setLoadingSubmit(false);
+  //   }
+  // };
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -248,13 +248,8 @@ export default function Page({ params }: PageProps) {
       }),
     };
 
-    if (env === "production" && selectedModel !== "REST API") {
-      handleSubmitProduction(e);
-      setBase64Images(null);
-    } else {
-      handleSubmit(e, requestOptions);
-      setBase64Images(null);
-    }
+    handleSubmit(e, requestOptions);
+    setBase64Images(null);
   };
 
   const onOpenChange = (isOpen: boolean) => {
@@ -281,7 +276,7 @@ export default function Page({ params }: PageProps) {
           error={error}
           stop={stop}
           navCollapsedSize={10}
-          defaultLayout={[30, 160]}
+          defaultLayout={[20, 80]}
           formRef={formRef as React.RefObject<HTMLFormElement>}
           setMessages={setMessages}
           setInput={setInput}

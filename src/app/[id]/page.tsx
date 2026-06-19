@@ -204,7 +204,7 @@ export default function Page({ params }: PageProps) {
         error={error}
         stop={stop}
         navCollapsedSize={10}
-        defaultLayout={[30, 160]}
+        defaultLayout={[20, 80]}
         formRef={formRef as React.RefObject<HTMLFormElement>}
         setMessages={setMessages}
         setInput={setInput}
