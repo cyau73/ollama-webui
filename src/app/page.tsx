@@ -22,12 +22,14 @@ import React, { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
 import useChatStore from "@/app/hooks/useChatStore";
+import { useRouter } from "next/dist/client/components/navigation";
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
 export default function Page({ params }: PageProps) {
+  const router = useRouter();
   const unpackedParams = React.use(params);
   const activeId = React.useMemo(() => unpackedParams.id || uuidv4(), [unpackedParams.id]);
   const isHydrated = useRef(false); // Add this at the top of your component
@@ -52,10 +54,18 @@ export default function Page({ params }: PageProps) {
     },
     // Add the onFinish callback to save after every successful stream
     onFinish: (message) => {
+      console.log("activeId:", activeId);
+      console.log("isPendingNavigation:", isPendingNavigation);
+
       if (!activeId) return;
       const updatedHistory = [...messages, message];
       saveToLocalStorage(activeId, updatedHistory);
       window.dispatchEvent(new Event("storage"));
+
+      if (isPendingNavigation.current) {
+        isPendingNavigation.current = false;
+        router.push(`/${activeId}`);
+      }
     },
     onError: (error) => {
       setLoadingSubmit(false);
@@ -72,6 +82,8 @@ export default function Page({ params }: PageProps) {
   const base64Images = useChatStore((state) => state.base64Images);
   const setBase64Images = useChatStore((state) => state.setBase64Images);
   const env = process.env.NODE_ENV;
+
+  const isPendingNavigation = useRef(false);
 
   // Safe Client hydration for history log entries & settings
   useEffect(() => {
@@ -115,6 +127,13 @@ export default function Page({ params }: PageProps) {
       setOllama(newOllama);
     }
   }, [selectedModel, env]);
+
+  // Add this helper to your page.tsx or a utility file
+  const initializeChat = (id: string) => {
+    if (!localStorage.getItem(id)) {
+      localStorage.setItem(id, JSON.stringify([]));
+    }
+  };
 
   const saveToLocalStorage = (id: string, data: any) => {
     if (!id || id === 'undefined') {
@@ -178,6 +197,11 @@ export default function Page({ params }: PageProps) {
       // Notify app that storage is completed
       window.dispatchEvent(new Event("storage"));
 
+      if (isPendingNavigation) {
+        isPendingNavigation.current = false;
+        router.push(`/${activeId}`); // Navigate here after successful storage
+      }
+
     } catch (err) {
       console.error(err);
       // 1. Convert the unknown error safely
@@ -194,6 +218,22 @@ export default function Page({ params }: PageProps) {
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    if (!unpackedParams.id) {
+      isPendingNavigation.current = true; // Flag that we need to move once done
+
+      // 1. Save the first message to localStorage manually before moving
+      const initialMsg: Message = {
+        role: "user",
+        content: input,
+        id: uuidv4(),
+        experimental_attachments: base64Images ? base64Images.map(url => ({ contentType: "image/base64", url })) : []
+      };
+
+      // 2. Persist to storage using the NEW activeId
+      saveToLocalStorage(activeId, [initialMsg]);
+    }
+
     setLoadingSubmit(true);
 
     const attachments: Attachment[] = base64Images

@@ -45,20 +45,24 @@ export default function ChatTopbar({
     setCurrentModel(getSelectedModel());
 
     const env = process.env.NODE_ENV;
+    console.log("NODE_ENV", env);
 
     const fetchModels = async () => {
+
       if (env === "production") {
+        console.log("URL", process.env.NEXT_PUBLIC_OLLAMA_URL);
+
         const fetchedModels = await fetch(process.env.NEXT_PUBLIC_OLLAMA_URL + "/api/tags");
         const json = await fetchedModels.json();
-        const apiModels = json.models.map((model : any) => model.name);
+        const apiModels = json.models.map((model: any) => model.name);
         setModels([...apiModels]);
-      } 
+      }
       else {
-        const fetchedModels = await fetch("/api/tags") 
+        const fetchedModels = await fetch("/api/tags")
         const json = await fetchedModels.json();
-        const apiModels = json.models.map((model : any) => model.name);
+        const apiModels = json.models.map((model: any) => model.name);
         setModels([...apiModels]);
-    }
+      }
     }
     fetchModels();
   }, []);
@@ -89,7 +93,7 @@ export default function ChatTopbar({
             isMobile={false}
             messages={messages}
             setMessages={setMessages}
-            closeSidebar={handleCloseSidebar} 
+            closeSidebar={handleCloseSidebar}
           />
         </SheetContent>
       </Sheet>
