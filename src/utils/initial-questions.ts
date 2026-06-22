@@ -15,13 +15,13 @@ export const INITIAL_QUESTIONS = [
     content: "What year did the Titanic sink?",
   },
   {
-    content: "Who painted the Mona Lisa?",
+    content: "How many seasons are there in the TV show Game of Thrones?",
   },
   {
-    content: "What is the square root of 144?",
+    content: "Who are the stars of the TV show Supernatural?",
   },
   {
-    content: "Who is the current President of the United States?",
+    content: "Who is the current Prime Minister of Singapore?",
   },
   {
     content: "What is the tallest mountain in the world?",
