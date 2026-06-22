@@ -165,14 +165,14 @@ export default function ChatList({
               },
             }}
             className={cn(
-              "flex flex-col gap-2 p-4 whitespace-pre-wrap",
+              "flex flex-col gap-2 p-4",
               message.role === "user" ? "items-end" : "items-start"
             )}
           >
             <div className="flex gap-3 items-center">
               {message.role === "user" && (
-                <div className="flex items-end gap-3">
-                  <div className="flex flex-col gap-2 bg-accent p-3 rounded-md max-w-xs sm:max-w-2xl overflow-x-auto">
+                <div className="flex items-end gap-3 w-full justify-end">
+                  <div className="flex flex-col gap-2 bg-accent p-3 rounded-md w-full max-w-[90%] md:max-w-[90%] whitespace-pre-line break-words md:break-normal overflow-x-auto">
                     <div className="flex gap-2">
                       {message.experimental_attachments?.filter(attachment => attachment.contentType?.startsWith('image/'),).map((attachment, index) => (
                         <Image
@@ -184,9 +184,9 @@ export default function ChatList({
                         />
                       ))}
                     </div>
-                    <p className="text-end">{message.content}</p>
+                    <p className="text-start">{message.content}</p>
                   </div>
-                  <Avatar className="flex justify-start items-center overflow-hidden">
+                  <Avatar className="shrink-0flex justify-start items-center">
                     <AvatarImage
                       src="/"
                       alt="user"
@@ -211,12 +211,12 @@ export default function ChatList({
                       className="object-contain dark:invert"
                     />
                   </Avatar>
-                  <span className="bg-accent p-3 rounded-md max-w-xs sm:max-w-2xl overflow-x-auto">
+                  <span className="block bg-accent p-3 rounded-md w-full max-w-[95%] md:max-w-[90%] overflow-x-auto">
                     {/* Check if the message content contains a code block */}
                     {message.content.split("```").map((part, index) => {
                       if (index % 2 === 0) {
                         return (
-                          <Markdown key={index} remarkPlugins={[remarkGfm]}>
+                          <Markdown key={index} className="leading-relaxed space-y-3" remarkPlugins={[remarkGfm]}>
                             {part}
                           </Markdown>
                         );

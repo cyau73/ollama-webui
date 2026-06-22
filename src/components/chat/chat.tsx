@@ -1,3 +1,4 @@
+//components/chat/chat.tsx
 import React from "react";
 import ChatTopbar from "./chat-topbar";
 import ChatList from "./chat-list";
@@ -43,7 +44,7 @@ export default function Chat({
   setMessages
 }: ChatProps) {
   return (
-    <div className="flex flex-col justify-between w-full max-w-3xl h-full ">
+    <div className="flex flex-col justify-between w-full max-w-[80%] h-full ">
       <ChatTopbar
         setSelectedModel={setSelectedModel}
         isLoading={isLoading}
