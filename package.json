@@ -1,6 +1,6 @@
 {
-  "name": "nextjs-ollama-local-ai",
-  "version": "0.1.0",
+  "name": "ollama-webui",
+  "version": "1.0.1",
   "private": true,
   "scripts": {
     "dev": "next dev --webpack --port 4001",
@@ -57,8 +57,11 @@
     "autoprefixer": "^10.4.20",
     "eslint": "^9.0.0",
     "eslint-config-next": "^16.0.0",
-    "postcss": "^8.4.47",
+    "postcss": "^8.5.1",
     "tailwindcss": "^3.4.12",
     "typescript": "^5.6.2"
+  },
+  "overrides": {
+    "prismjs": "^1.30.0"
   }
 }
