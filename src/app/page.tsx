@@ -13,9 +13,6 @@ import {
 import { Input } from "@/components/ui/input";
 import UsernameForm from "@/components/username-form";
 import { getSelectedModel } from "@/lib/model-helper";
-// import { ChatOllama } from "@langchain/community/chat_models/ollama";
-// import { AIMessage, HumanMessage } from "@langchain/core/messages";
-// import { BytesOutputParser } from "@langchain/core/output_parsers";
 import { Attachment, ChatRequestOptions } from "ai";
 import { Message, useChat } from "ai/react";
 import React, { useEffect, useRef, useState } from "react";
@@ -118,17 +115,6 @@ export default function Page({ params }: PageProps) {
       isHydrated.current = true; // Mark as hydrated after successfully loading messages
     }
   }, [activeId, setMessages]);
-
-  // Setup Ollama pipeline engine configuration
-  // useEffect(() => {
-  //   if (env === "production" && selectedModel !== "REST API") {
-  //     const newOllama = new ChatOllama({
-  //       baseUrl: process.env.NEXT_PUBLIC_OLLAMA_URL || "http://localhost:11434",
-  //       model: selectedModel,
-  //     });
-  //     setOllama(newOllama);
-  //   }
-  // }, [selectedModel, env]);
 
   // Add this helper to your page.tsx or a utility file
   const initializeChat = (id: string) => {
