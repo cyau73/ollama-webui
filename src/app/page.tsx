@@ -69,7 +69,9 @@ export default function Page({ params }: PageProps) {
     },
     onError: (error) => {
       setLoadingSubmit(false);
-      toast.error("An error occurred. Please try again.");
+      console.error("Chat SDK Error:", error);
+      const message = error instanceof Error ? error.message : "An unexpected error occurred.";
+      toast.error(`Chat error: ${message}`);
     },
   });
 
@@ -151,70 +153,6 @@ export default function Page({ params }: PageProps) {
       }
     }
   };
-
-  // const handleSubmitProduction = async (e: React.FormEvent<HTMLFormElement>) => {
-  //   e.preventDefault();
-  //   if (!input.trim() || !ollama || !activeId) return;
-
-  //   const userMsg: Message = { role: "user", content: input, id: uuidv4() };
-  //   setInput("");
-
-  //   const updatedMessages = [...messages, userMsg];
-  //   setMessages(updatedMessages);
-
-  //   try {
-  //     const parser = new BytesOutputParser();
-  //     const stream = await ollama.pipe(parser).stream(
-  //       updatedMessages.map((m) =>
-  //         m.role === "user" ? new HumanMessage(m.content) : new AIMessage(m.content)
-  //       )
-  //     );
-
-  //     let responseMessage = "";
-  //     const assistantMessageId = uuidv4();
-
-  //     const decoder = new TextDecoder();
-
-  //     for await (const chunk of stream) {
-  //       const decodedChunk = decoder.decode(chunk, { stream: true });
-  //       responseMessage += decodedChunk;
-
-  //       //Update UI State only
-  //       setMessages((prevMessages) => {
-  //         const filtered = prevMessages.filter((m) => m.id !== assistantMessageId);
-  //         const nextHistory = [
-  //           ...filtered,
-  //           { role: "assistant" as const, content: responseMessage, id: assistantMessageId },
-  //         ];
-
-  //         return nextHistory;
-  //       });
-  //     }
-  //     // Storage after the loop to ensure the final message is saved
-  //     const finalHistory = [...updatedMessages, { role: "assistant", content: responseMessage, id: assistantMessageId }];
-  //     saveToLocalStorage(activeId, finalHistory);
-
-  //     // Notify app that storage is completed
-  //     window.dispatchEvent(new Event("storage"));
-
-  //     if (isPendingNavigation) {
-  //       isPendingNavigation.current = false;
-  //       router.push(`/${activeId}`); // Navigate here after successful storage
-  //     }
-
-  //   } catch (err) {
-  //     console.error(err);
-  //     // 1. Convert the unknown error safely
-  //     const standardError = err instanceof Error ? err : new Error("Ollama connection failed");
-  //     console.error(err);
-  //     // 2. Explicitly call your unified error configuration block manually
-  //     // This allows you to maintain single-point error monitoring:
-  //     toast.error("An error occurred. Please try again.");
-  //     setLoadingSubmit(false);
-  //   } finally {
-  //     setLoadingSubmit(false);
-  //   }
-  // };
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

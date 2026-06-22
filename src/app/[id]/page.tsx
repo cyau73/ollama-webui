@@ -40,7 +40,9 @@ export default function Page({ params }: PageProps) {
     },
     onError: (error) => {
       setLoadingSubmit(false);
-      toast.error("An error occurred. Please try again.");
+      console.error("Chat SDK Error:", error);
+      const message = error instanceof Error ? error.message : "An unexpected error occurred.";
+      toast.error(`Chat error: ${message}`);
     },
   });
 
